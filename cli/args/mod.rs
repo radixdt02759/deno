@@ -1263,14 +1263,13 @@ impl CliOptions {
       full_paths.extend(paths.iter().map(|path| self.initial_cwd.join(path)));
     }
 
-    // Add environment files to watch paths
-    if let Some(env_files) = &self.flags.env_file {
-      for env_file in env_files {
-        let env_path = self.initial_cwd.join(env_file);
-        if env_path.exists() {
-          full_paths.push(env_path);
-        }
-      }
+    if let Some(env_file_names) = &self.flags.env_file {
+      // Only watch the exact environment files specified
+      full_paths.extend(
+        env_file_names
+          .iter()
+          .map(|name| self.initial_cwd.join(name)),
+      );
     }
 
     if let Ok(Some(import_map_path)) = self
@@ -1292,16 +1291,8 @@ impl CliOptions {
         full_paths.push(pkg_json.path.clone());
       }
     }
-
-
-    if let Some(env_file_names) = &self.flags.env_file {
-      full_paths.extend(
-        env_file_names
-          .iter()
-          .map(|name| self.initial_cwd.join(name)),
-      );
-    }
     
+    eprintln!("Watch paths: {:#?}", full_paths);
     full_paths
   }
 
