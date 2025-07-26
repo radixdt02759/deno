@@ -57,6 +57,7 @@ use node_resolver::NodeResolverOptions;
 use node_resolver::cache::NodeResolutionThreadLocalCache;
 use once_cell::sync::OnceCell;
 use sys_traits::EnvCurrentDir;
+use crate::args::load_env_variables_from_env_file;
 use crate::util::env_loader::load_env_variables_from_env_files;
 use crate::args::BundleFlags;
 use crate::args::BundlePlatform;
@@ -334,12 +335,7 @@ pub struct CliFactory {
 
 impl CliFactory {
   pub fn from_flags(flags: Arc<Flags>) -> Self {
-    println!("from_flags");
-    // Load environment variables before creating the factory so they propagate
-    // into everything created by the factory
-    if let Some(env_files) = &flags.env_file {
-        let _ = load_env_variables_from_env_files(env_files.as_slice());
-    }
+    load_env_variables_from_env_file(flags.env_file.as_ref(), flags.log_level);
 
     Self {
       flags,
@@ -353,9 +349,6 @@ impl CliFactory {
     flags: Arc<Flags>,
     watcher_communicator: Arc<WatcherCommunicator>,
   ) -> Self {
-    println!("from_flags_for_watcher");
-    // Load environment variables before creating the factory so they propagate
-    // into everything created by the factory
     if let Some(env_files) = &flags.env_file {
         let _ = load_env_variables_from_env_files(env_files.as_slice());
     }
