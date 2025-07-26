@@ -89,9 +89,9 @@ pub fn load_env_file<P: AsRef<Path>>(
     let mut current_file_vars = HashSet::new();
 
     // Use dotenvy to parse the file
-    match dotenvy::from_filename_override(file_path.as_ref()) {
+    match dotenvy::from_filename(file_path.as_ref()) {
         Ok(_) => {
-            // Since from_filename_override doesn't give us granular control,
+            // Since from_filename doesn't give us granular control,
             // we need to use dotenvy::from_path_iter for better error handling
             match dotenvy::from_path_iter(file_path.as_ref()) {
                 Ok(iter) => {
@@ -203,7 +203,7 @@ pub fn load_env_file<P: AsRef<Path>>(
                     match env::var(&var_name) {
                         Ok(current_value) => {
                             // If the variable is not present in original_env, we set it, so only remove if unchanged
-                            if !inner.original_env.contains_key(&var_name) || current_value == "" {
+                            if current_value.as_str() == inner.loaded_variables.get(&var_name).unwrap_or(&"".to_string())     {
                                 unsafe { env::remove_var(&var_name); }
                             }
                         }
