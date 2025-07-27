@@ -1292,7 +1292,6 @@ impl CliOptions {
       }
     }
     
-    eprintln!("Watch paths: {:#?}", full_paths);
     full_paths
   }
 

@@ -80,8 +80,6 @@ pub fn load_env_file<P: AsRef<Path>>(
     // Use dotenvy to parse the file
     match dotenvy::from_filename(file_path.as_ref()) {
         Ok(_) => {
-            // Since from_filename doesn't give us granular control,
-            // we need to use dotenvy::from_path_iter for better error handling
             match dotenvy::from_path_iter(file_path.as_ref()) {
                 Ok(iter) => {
                     for item in iter {
@@ -94,15 +92,14 @@ pub fn load_env_file<P: AsRef<Path>>(
                                 current_file_vars.insert(key.clone());
                                 inner.loaded_variables.insert(key.clone(), path_str.clone());
                                 loaded_count += 1;
-                                
-                                // Optional debug logging
-                                if log_level.map(|l| l >= log::Level::Debug).unwrap_or(false) {
-                                    println!("Loaded: {}={} (from {})", key, value, path_str);
-                                }
                             }
                             Err(e) => {
                                 // Handle parsing errors with detailed messages
-                                if log_level.map(|l| l >= log::Level::Info).unwrap_or(true) {
+                                #[allow(clippy::print_stderr)]
+                                if log_level
+                                    .map(|l| l >= log::Level::Info)
+                                    .unwrap_or(true)
+                                {
                                     match e {
                                         dotenvy::Error::LineParse(line, index) => eprintln!(
                                             "{} Parsing failed within the specified environment file: {} at index: {} of the value: {}",
@@ -111,16 +108,20 @@ pub fn load_env_file<P: AsRef<Path>>(
                                             index,
                                             line
                                         ),
+                                        dotenvy::Error::Io(_) => eprintln!(
+                                            "{} The `--env-file` flag was used, but the environment file specified '{}' was not found.",
+                                            colors::yellow("Warning"),
+                                            path_str
+                                        ),
                                         dotenvy::Error::EnvVar(_) => eprintln!(
                                             "{} One or more of the environment variables isn't present or not unicode within the specified environment file: {}",
                                             colors::yellow("Warning"),
                                             path_str
                                         ),
                                         _ => eprintln!(
-                                            "{} Failed to parse line in {}: {}",
+                                            "{} Unknown failure occurred with the specified environment file: {}",
                                             colors::yellow("Warning"),
-                                            path_str,
-                                            e
+                                            path_str
                                         ),
                                     }
                                 }
@@ -136,7 +137,11 @@ pub fn load_env_file<P: AsRef<Path>>(
         }
         Err(error) => {
             // Handle different types of errors with appropriate logging
-            if log_level.map(|l| l >= log::Level::Info).unwrap_or(true) {
+            #[allow(clippy::print_stderr)]
+            if log_level
+                .map(|l| l >= log::Level::Info)
+                .unwrap_or(true)
+            {
                 match error {
                     dotenvy::Error::LineParse(line, index) => eprintln!(
                         "{} Parsing failed within the specified environment file: {} at index: {} of the value: {}",
@@ -146,7 +151,7 @@ pub fn load_env_file<P: AsRef<Path>>(
                         line
                     ),
                     dotenvy::Error::Io(_) => eprintln!(
-                        "{} The environment file specified '{}' was not found.",
+                        "{} The `--env-file` flag was used, but the environment file specified '{}' was not found.",
                         colors::yellow("Warning"),
                         path_str
                     ),
@@ -222,7 +227,11 @@ pub fn load_env_file<P: AsRef<Path>>(
                 }
                 Err(e) => {
                     // Log critical errors but continue processing other files
-                    if log_level.map(|l| l >= log::Level::Info).unwrap_or(true) {
+                    #[allow(clippy::print_stderr)]
+                    if log_level
+                        .map(|l| l >= log::Level::Info)
+                        .unwrap_or(true)
+                    {
                         eprintln!(
                             "{} Critical error loading {}: {}",
                             colors::yellow("Warning"),
@@ -238,7 +247,7 @@ pub fn load_env_file<P: AsRef<Path>>(
     }
 }
 
-pub fn load_env_variables_from_env_files<P: AsRef<Path>>(file_paths: &[P]) -> Result<usize, Box<dyn std::error::Error>> {
+pub fn load_env_variables_from_env_files<P: AsRef<Path>>(file_paths: &[P], flags_log_level: Option<log::Level>) -> Result<usize, Box<dyn std::error::Error>> {
     let file_paths_vec: Vec<&P> = file_paths.iter().collect();
-    Ok(EnvManager::instance().load_env_variables_from_env_files(Some(&file_paths_vec), None))
+    Ok(EnvManager::instance().load_env_variables_from_env_files(Some(&file_paths_vec), flags_log_level))
 }
