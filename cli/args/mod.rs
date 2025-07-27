@@ -1291,7 +1291,7 @@ impl CliOptions {
         full_paths.push(pkg_json.path.clone());
       }
     }
-    
+
     full_paths
   }
 

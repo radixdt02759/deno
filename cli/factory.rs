@@ -57,8 +57,7 @@ use node_resolver::NodeResolverOptions;
 use node_resolver::cache::NodeResolutionThreadLocalCache;
 use once_cell::sync::OnceCell;
 use sys_traits::EnvCurrentDir;
-use crate::args::load_env_variables_from_env_file;
-use crate::util::env_loader::load_env_variables_from_env_files;
+
 use crate::args::BundleFlags;
 use crate::args::BundlePlatform;
 use crate::args::CliLockfile;
@@ -67,6 +66,7 @@ use crate::args::ConfigFlag;
 use crate::args::DenoSubcommand;
 use crate::args::Flags;
 use crate::args::InstallFlags;
+use crate::args::load_env_variables_from_env_file;
 use crate::cache::Caches;
 use crate::cache::CodeCache;
 use crate::cache::DenoDir;
@@ -106,6 +106,7 @@ use crate::tools::lint::LintRuleProvider;
 use crate::tools::run::hmr::HmrRunner;
 use crate::tsc::TypeCheckingCjsTracker;
 use crate::type_checker::TypeChecker;
+use crate::util::env_loader::load_env_variables_from_env_files;
 use crate::util::file_watcher::WatcherCommunicator;
 use crate::util::progress_bar::ProgressBar;
 use crate::util::progress_bar::ProgressBarStyle;
@@ -350,7 +351,10 @@ impl CliFactory {
     watcher_communicator: Arc<WatcherCommunicator>,
   ) -> Self {
     if let Some(env_files) = &flags.env_file {
-        let _ = load_env_variables_from_env_files(env_files.as_slice(), flags.log_level);
+      let _ = load_env_variables_from_env_files(
+        env_files.as_slice(),
+        flags.log_level,
+      );
     }
 
     CliFactory {

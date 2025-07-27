@@ -2056,24 +2056,26 @@ async fn bundle_watch() {
   check_alive_then_kill(child);
 }
 
-// nothing 
+// nothing
 #[flaky_test(tokio)]
 async fn run_watch_env_file_basic() {
   let t = TempDir::new();
-  
+
   // Create initial .env file
   let env_file = t.path().join(".env");
   std::fs::write(&env_file, "FOO=initial_value\nBAR=test_value").unwrap();
-  
+
   // Create main script that reads environment variables
   let main_script = t.path().join("main.js");
-  std::fs::write(&main_script, 
+  std::fs::write(
+    &main_script,
     r#"
 console.log("FOO:", Deno.env.get("FOO"));
 console.log("BAR:", Deno.env.get("BAR"));
 console.log("---");
 "#,
-  ).unwrap();
+  )
+  .unwrap();
 
   let mut child = util::deno_cmd()
     .current_dir(t.path())
@@ -2094,11 +2096,15 @@ console.log("---");
   wait_contains("---", &mut stdout_lines).await;
 
   // Change the .env file
-  std::fs::write(&env_file, "FOO=updated_value\nBAR=test_value\nNEW_VAR=new_value").unwrap();
+  std::fs::write(
+    &env_file,
+    "FOO=updated_value\nBAR=test_value\nNEW_VAR=new_value",
+  )
+  .unwrap();
 
   // Wait for restart
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Check that new values are reflected
   wait_contains("FOO: updated_value", &mut stdout_lines).await;
   wait_contains("BAR: test_value", &mut stdout_lines).await;
@@ -2112,24 +2118,26 @@ console.log("---");
 #[flaky_test(tokio)]
 async fn run_watch_env_file_multiple_files() {
   let t = TempDir::new();
-  
+
   // Create multiple .env files
   let env_file1 = t.path().join(".env");
   let env_file2 = t.path().join(".env.local");
-  
+
   std::fs::write(&env_file1, "FOO=from_env\nBAR=from_env").unwrap();
   std::fs::write(&env_file2, "BAR=from_local\nBAZ=from_local").unwrap();
 
   // Create main script
   let main_script = t.path().join("main.js");
-  std::fs::write(&main_script,
+  std::fs::write(
+    &main_script,
     r#"
 console.log("FOO:", Deno.env.get("FOO"));
 console.log("BAR:", Deno.env.get("BAR"));
 console.log("BAZ:", Deno.env.get("BAZ"));
 console.log("---");
 "#,
-  ).unwrap();
+  )
+  .unwrap();
 
   let mut child = util::deno_cmd()
     .current_dir(t.path())
@@ -2152,11 +2160,12 @@ console.log("---");
   wait_contains("---", &mut stdout_lines).await;
 
   // Change the first .env file
-  std::fs::write(&env_file1, "FOO=updated_from_env\nBAR=updated_from_env").unwrap();
+  std::fs::write(&env_file1, "FOO=updated_from_env\nBAR=updated_from_env")
+    .unwrap();
 
   // Wait for restart
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Check that values are updated (BAR should still be from .env.local)
   wait_contains("FOO: updated_from_env", &mut stdout_lines).await;
   // BAR should still be from .env.local (precedence test)
@@ -2165,11 +2174,15 @@ console.log("---");
   wait_contains("---", &mut stdout_lines).await;
 
   // Change the second .env file
-  std::fs::write(&env_file2, "BAR=updated_from_local\nBAZ=updated_from_local\nNEW_VAR=new").unwrap();
+  std::fs::write(
+    &env_file2,
+    "BAR=updated_from_local\nBAZ=updated_from_local\nNEW_VAR=new",
+  )
+  .unwrap();
 
   // Wait for restart
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Check that values are updated
   wait_contains("FOO: updated_from_env", &mut stdout_lines).await;
   wait_contains("BAR: updated_from_local", &mut stdout_lines).await;
@@ -2183,20 +2196,22 @@ console.log("---");
 #[flaky_test(tokio)]
 async fn run_watch_env_file_removed() {
   let t = TempDir::new();
-  
+
   // Create initial .env file
   let env_file = t.path().join(".env");
   std::fs::write(&env_file, "FOO=initial_value\nBAR=test_value").unwrap();
-  
+
   // Create main script
   let main_script = t.path().join("main.js");
-  std::fs::write(&main_script,
+  std::fs::write(
+    &main_script,
     r#"
 console.log("FOO:", Deno.env.get("FOO"));
 console.log("BAR:", Deno.env.get("BAR"));
 console.log("---");
 "#,
-  ).unwrap();
+  )
+  .unwrap();
 
   let mut child = util::deno_cmd()
     .current_dir(t.path())
@@ -2221,14 +2236,20 @@ console.log("---");
 
   // Wait for restart
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Check that environment variables are no longer available
   let foo_line = wait_contains("FOO:", &mut stdout_lines).await;
-  assert!(foo_line.contains("undefined"), "FOO should be undefined after .env file is removed");
-  
+  assert!(
+    foo_line.contains("undefined"),
+    "FOO should be undefined after .env file is removed"
+  );
+
   let bar_line = wait_contains("BAR:", &mut stdout_lines).await;
-  assert!(bar_line.contains("undefined"), "BAR should be undefined after .env file is removed");
-  
+  assert!(
+    bar_line.contains("undefined"),
+    "BAR should be undefined after .env file is removed"
+  );
+
   wait_contains("---", &mut stdout_lines).await;
 
   check_alive_then_kill(child);
@@ -2237,20 +2258,22 @@ console.log("---");
 #[flaky_test(tokio)]
 async fn run_watch_env_file_invalid_syntax() {
   let t = TempDir::new();
-  
+
   // Create initial valid .env file
   let env_file = t.path().join(".env");
   std::fs::write(&env_file, "FOO=valid_value\nBAR=valid_value").unwrap();
-  
+
   // Create main script
   let main_script = t.path().join("main.js");
-  std::fs::write(&main_script,
+  std::fs::write(
+    &main_script,
     r#"
 console.log("FOO:", Deno.env.get("FOO"));
 console.log("BAR:", Deno.env.get("BAR"));
 console.log("---");
 "#,
-  ).unwrap();
+  )
+  .unwrap();
 
   let mut child = util::deno_cmd()
     .current_dir(t.path())
@@ -2271,18 +2294,28 @@ console.log("---");
   wait_contains("---", &mut stdout_lines).await;
 
   // Change to invalid .env file
-  std::fs::write(&env_file, "FOO=valid_value\nINVALID_LINE_WITHOUT_EQUALS\nBAR=valid_value").unwrap();
+  std::fs::write(
+    &env_file,
+    "FOO=valid_value\nINVALID_LINE_WITHOUT_EQUALS\nBAR=valid_value",
+  )
+  .unwrap();
 
   // Wait for restart - should show warning but continue
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Should still show valid values - test the error handling behavior
   let foo_line = wait_contains("FOO:", &mut stdout_lines).await;
-  assert!(foo_line.contains("valid_value"), "FOO should still be valid despite invalid syntax in file");
-  
+  assert!(
+    foo_line.contains("valid_value"),
+    "FOO should still be valid despite invalid syntax in file"
+  );
+
   let bar_line = wait_contains("BAR:", &mut stdout_lines).await;
-  assert!(bar_line.contains("valid_value"), "BAR should still be valid despite invalid syntax in file");
-  
+  assert!(
+    bar_line.contains("valid_value"),
+    "BAR should still be valid despite invalid syntax in file"
+  );
+
   wait_contains("---", &mut stdout_lines).await;
 
   // Also check that a warning was logged about the invalid syntax
@@ -2295,20 +2328,22 @@ console.log("---");
 #[flaky_test(tokio)]
 async fn run_watch_env_file_with_script_changes() {
   let t = TempDir::new();
-  
+
   // Create initial .env file
   let env_file = t.path().join(".env");
   std::fs::write(&env_file, "FOO=env_value\nBAR=env_value").unwrap();
-  
+
   // Create main script
   let main_script = t.path().join("main.js");
-  std::fs::write(&main_script,
+  std::fs::write(
+    &main_script,
     r#"
 console.log("FOO:", Deno.env.get("FOO"));
 console.log("BAR:", Deno.env.get("BAR"));
 console.log("---");
 "#,
-  ).unwrap();
+  )
+  .unwrap();
 
   let mut child = util::deno_cmd()
     .current_dir(t.path())
@@ -2329,36 +2364,45 @@ console.log("---");
   wait_contains("---", &mut stdout_lines).await;
 
   // Change the script to read different env vars
-  std::fs::write(&main_script,
+  std::fs::write(
+    &main_script,
     r#"
 console.log("FOO:", Deno.env.get("FOO"));
 console.log("BAR:", Deno.env.get("BAR"));
 console.log("BAZ:", Deno.env.get("BAZ"));
 console.log("---");
 "#,
-  ).unwrap();
+  )
+  .unwrap();
 
   // Wait for restart
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Should show FOO and BAR, but BAZ should be undefined
   wait_contains("FOO: env_value", &mut stdout_lines).await;
   wait_contains("BAR: env_value", &mut stdout_lines).await;
   let baz_line = wait_contains("BAZ:", &mut stdout_lines).await;
-  assert!(baz_line.contains("undefined"), "BAZ should be undefined since it's not in the .env file yet");
+  assert!(
+    baz_line.contains("undefined"),
+    "BAZ should be undefined since it's not in the .env file yet"
+  );
   wait_contains("---", &mut stdout_lines).await;
 
   // Now add BAZ to .env file
-  std::fs::write(&env_file, "FOO=env_value\nBAR=env_value\nBAZ=new_env_value").unwrap();
+  std::fs::write(&env_file, "FOO=env_value\nBAR=env_value\nBAZ=new_env_value")
+    .unwrap();
 
   // Wait for restart
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Now BAZ should have a value
   wait_contains("FOO: env_value", &mut stdout_lines).await;
   wait_contains("BAR: env_value", &mut stdout_lines).await;
   let baz_line = wait_contains("BAZ:", &mut stdout_lines).await;
-  assert!(baz_line.contains("new_env_value"), "BAZ should now have a value after being added to .env file");
+  assert!(
+    baz_line.contains("new_env_value"),
+    "BAZ should now have a value after being added to .env file"
+  );
   wait_contains("---", &mut stdout_lines).await;
 
   check_alive_then_kill(child);
@@ -2367,21 +2411,23 @@ console.log("---");
 #[flaky_test(tokio)]
 async fn run_watch_env_file_with_multiline_values() {
   let t = TempDir::new();
-  
+
   // Create .env file with multiline values
   let env_file = t.path().join(".env");
   std::fs::write(&env_file, "FOO=simple_value\nMULTILINE=\"First Line\nSecond Line\"\nBAR=another_value").unwrap();
-  
+
   // Create main script
   let main_script = t.path().join("main.js");
-  std::fs::write(&main_script,
+  std::fs::write(
+    &main_script,
     r#"
 console.log("FOO:", Deno.env.get("FOO"));
 console.log("MULTILINE:", Deno.env.get("MULTILINE"));
 console.log("BAR:", Deno.env.get("BAR"));
 console.log("---");
 "#,
-  ).unwrap();
+  )
+  .unwrap();
 
   let mut child = util::deno_cmd()
     .current_dir(t.path())
@@ -2400,7 +2446,10 @@ console.log("---");
   wait_contains("FOO: simple_value", &mut stdout_lines).await;
   // Check for multiline content - this might be the issue if multiline parsing doesn't work
   let multiline_line = wait_contains("MULTILINE:", &mut stdout_lines).await;
-  assert!(multiline_line.contains("First Line"), "Multiline values should be parsed correctly");
+  assert!(
+    multiline_line.contains("First Line"),
+    "Multiline values should be parsed correctly"
+  );
   // Note: The newline in multiline might not appear as separate lines in console.log output
   // This assertion might need adjustment based on how Deno actually handles multiline env vars
   wait_contains("BAR: another_value", &mut stdout_lines).await;
@@ -2411,11 +2460,14 @@ console.log("---");
 
   // Wait for restart
   wait_contains("Restarting", &mut stderr_lines).await;
-  
+
   // Check updated multiline value
   wait_contains("FOO: simple_value", &mut stdout_lines).await;
   let multiline_line = wait_contains("MULTILINE:", &mut stdout_lines).await;
-  assert!(multiline_line.contains("Updated First Line"), "Updated multiline values should be reflected");
+  assert!(
+    multiline_line.contains("Updated First Line"),
+    "Updated multiline values should be reflected"
+  );
   wait_contains("BAR: another_value", &mut stdout_lines).await;
   wait_contains("---", &mut stdout_lines).await;
 
