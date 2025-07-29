@@ -64,6 +64,16 @@ impl EnvManager {
     log_level: Option<log::Level>,
   ) -> Result<usize, Box<dyn std::error::Error>> {
     let mut inner = self.inner.lock().unwrap();
+    self.load_env_file_inner(file_path, log_level, &mut inner)
+  }
+
+  /// Internal method that accepts an already-acquired lock to avoid deadlocks
+  fn load_env_file_inner<P: AsRef<Path>>(
+    &self,
+    file_path: P,
+    log_level: Option<log::Level>,
+    inner: &mut EnvManagerInner,
+  ) -> Result<usize, Box<dyn std::error::Error>> {
     let path_str = file_path.as_ref().to_string_lossy().to_string();
 
     // Check if file exists
@@ -180,7 +190,6 @@ impl EnvManager {
       .collect();
 
     for var_name in variables_to_remove {
-      println!("🔧 ENV_LOADER: Removing variable: {}", var_name);
       if !inner.original_env.contains_key(&var_name) {
         unsafe {
           env::remove_var(&var_name);
@@ -270,14 +279,14 @@ impl EnvManager {
 
     let mut inner = self.inner.lock().unwrap();
 
-      inner.unused_variables = std::mem::take(&mut inner.loaded_variables);
-      inner.loaded_variables = HashMap::new();
-      inner.file_variables.clear();
+    inner.unused_variables = std::mem::take(&mut inner.loaded_variables);
+    inner.loaded_variables = HashMap::new();
+    inner.file_variables.clear();
 
     let mut total_loaded = 0;
 
     for env_file_name in env_file_names.iter().rev() {
-      match self.load_env_file(env_file_name, log_level) {
+      match self.load_env_file_inner(env_file_name, log_level, &mut inner) {
         Ok(count) => {
           total_loaded += count;
         }
