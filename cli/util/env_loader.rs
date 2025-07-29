@@ -1,6 +1,7 @@
 // Copyright 2018-2025 the Deno authors. MIT license.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::env;
 use std::path::Path;
 use std::sync::Arc;
@@ -12,9 +13,9 @@ use deno_terminal::colors;
 #[derive(Debug, Clone)]
 struct EnvManagerInner {
   // Track all loaded variables and their values
-  loaded_variables: HashMap<String, String>, // variable_name -> variable value
+  loaded_variables: HashSet<String>,
   // Track variables that are no longer present in any loaded file
-  unused_variables: HashMap<String, String>, // variable_name -> variable value
+  unused_variables: HashSet<String>,
   // Track original env vars that existed before we started
   original_env: HashMap<String, String>,
 }
@@ -25,8 +26,8 @@ impl EnvManagerInner {
     let original_env: HashMap<String, String> = env::vars().collect();
 
     Self {
-      loaded_variables: HashMap::new(),
-      unused_variables: HashMap::new(),
+      loaded_variables: HashSet::new(),
+      unused_variables: HashSet::new(),
       original_env,
     }
   }
@@ -47,30 +48,14 @@ impl EnvManager {
       inner: Arc::new(Mutex::new(EnvManagerInner::new())),
     })
   }
-  ///
-  /// # Arguments
-  /// * `file_path` - Path to the .env file
-  /// * `log_level` - Optional log level to control error message visibility
-  ///
-  /// # Returns
-  /// * `Ok(usize)` - Number of variables successfully loaded
-  /// * `Err(Box<dyn std::error::Error>)` - Critical errors that prevent loading
-  pub fn load_env_file<P: AsRef<Path>>(
-    &self,
-    file_path: P,
-    log_level: Option<log::Level>,
-  ) -> Result<usize, Box<dyn std::error::Error>> {
-    let mut inner = self.inner.lock().unwrap();
-    self.load_env_file_inner(file_path, log_level, &mut inner)
-  }
 
-  /// Internal method that accepts an already-acquired lock to avoid deadlocks
+  // Internal method that accepts an already-acquired lock to avoid deadlocks
   fn load_env_file_inner<P: AsRef<Path>>(
     &self,
     file_path: P,
     log_level: Option<log::Level>,
     inner: &mut EnvManagerInner,
-  ) -> Result<usize, Box<dyn std::error::Error>> {
+  ) {
     let path_str = file_path.as_ref().to_string_lossy().to_string();
 
     // Check if file exists
@@ -84,10 +69,8 @@ impl EnvManager {
           path_str
         );
       }
-      return Ok(0);
+      return;
     }
-
-    let mut loaded_count = 0;
 
     match dotenvy::from_path_iter(file_path.as_ref()) {
       Ok(iter) => {
@@ -95,7 +78,7 @@ impl EnvManager {
           match item {
             Ok((key, value)) => {
               // Check if this variable is already loaded from a previous file
-              if inner.loaded_variables.contains_key(&key) {
+              if inner.loaded_variables.contains(&key) {
                 // Variable already exists from a previous file, skip it
                 #[allow(clippy::print_stderr)]
                 if log_level.map(|l| l >= log::Level::Debug).unwrap_or(false) {
@@ -121,11 +104,8 @@ impl EnvManager {
               }
 
               // Track this variable
-              inner.loaded_variables.insert(key.clone(), value.clone());
-              if inner.unused_variables.contains_key(&key) {
-                inner.unused_variables.remove(&key);
-              }
-              loaded_count += 1;
+              inner.loaded_variables.insert(key.clone());
+              inner.unused_variables.remove(&key);
             }
             Err(e) => {
               // Handle parsing errors with detailed messages
@@ -161,12 +141,15 @@ impl EnvManager {
         }
       }
       Err(e) => {
-        // This is a critical error - file exists but can't be read
-        return Err(format!("Failed to read {}: {}", path_str, e).into());
+        #[allow(clippy::print_stderr)]
+        eprintln!(
+          "{} Failed to read {}: {}",
+          colors::yellow("Warning"),
+          path_str,
+          e
+        );
       }
     }
-
-    Ok(loaded_count)
   }
 
   /// Clean up variables that are no longer present in any loaded file
@@ -175,7 +158,7 @@ impl EnvManager {
     inner: &mut EnvManagerInner,
     log_level: Option<log::Level>,
   ) {
-    for var_name in inner.unused_variables.keys() {
+    for var_name in inner.unused_variables.iter() {
       if !inner.original_env.contains_key(var_name) {
         unsafe {
           env::remove_var(&var_name);
@@ -212,53 +195,30 @@ impl EnvManager {
     &self,
     file_paths: Option<&Vec<P>>,
     log_level: Option<log::Level>,
-  ) -> usize {
+  ) {
     let Some(env_file_names) = file_paths else {
-      return 0;
+      return;
     };
 
     let mut inner = self.inner.lock().unwrap();
 
     inner.unused_variables = std::mem::take(&mut inner.loaded_variables);
-    inner.loaded_variables = HashMap::new();
-
-    let mut total_loaded = 0;
+    inner.loaded_variables = HashSet::new();
 
     for env_file_name in env_file_names.iter().rev() {
-      match self.load_env_file_inner(env_file_name, log_level, &mut inner) {
-        Ok(count) => {
-          total_loaded += count;
-        }
-        Err(e) =>
-        {
-          #[allow(clippy::print_stderr)]
-          if log_level.map(|l| l >= log::Level::Info).unwrap_or(true) {
-            eprintln!(
-              "{} Critical error loading {}: {}",
-              colors::yellow("Warning"),
-              env_file_name.as_ref().to_string_lossy(),
-              e
-            );
-          }
-        }
-      }
+      self.load_env_file_inner(env_file_name, log_level, &mut inner);
     }
 
     self._cleanup_removed_variables(&mut inner, log_level);
-
-    total_loaded
   }
 }
 
 pub fn load_env_variables_from_env_files<P: AsRef<Path>>(
   file_paths: &[P],
   flags_log_level: Option<log::Level>,
-) -> Result<usize, Box<dyn std::error::Error>> {
+) {
   let file_paths_vec: Vec<&P> = file_paths.iter().collect();
-  Ok(
-    EnvManager::instance().load_env_variables_from_env_files(
-      Some(&file_paths_vec),
-      flags_log_level,
-    ),
-  )
+
+  EnvManager::instance()
+    .load_env_variables_from_env_files(Some(&file_paths_vec), flags_log_level);
 }
