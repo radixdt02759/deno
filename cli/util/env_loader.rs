@@ -95,16 +95,16 @@ impl EnvManager {
                 // Variable already exists from a previous file, skip it
                 #[allow(clippy::print_stderr)]
                 if log_level.map(|l| l >= log::Level::Debug).unwrap_or(false) {
-                  eprintln!(
+                eprintln!(
                     "{} Variable '{}' already loaded from '{}', skipping value from '{}'",
                     colors::yellow("Debug"),
-                    key,
+                  key,
                     inner
                       .loaded_variables
                       .get(&key)
                       .unwrap_or(&"unknown".to_string()),
-                    path_str
-                  );
+                  path_str
+                );
                 }
                 continue;
               }
@@ -168,20 +168,20 @@ impl EnvManager {
   }
 
   /// Clean up variables that are no longer present in any loaded file
-  fn _cleanup_removed_variables(
+    fn _cleanup_removed_variables(
     &self,
-    unused_vars: &HashMap<String, String>,
+    inner: &mut EnvManagerInner,
     log_level: Option<log::Level>,
   ) {
-    let inner = self.inner.lock().unwrap();
-    // Find variables that are loaded but no longer present in any file
 
-    for (var_name, _) in unused_vars {
-      // Check if this variable was originally set by us (not from original env)
-      if !inner.original_env.contains_key(&var_name.clone()) {
-        // Remove the variable from environment
-        // SAFETY: We're removing environment variables that we previously set.
-        // var_name is a valid UTF-8 string that we tracked when loading the env file.
+    let variables_to_remove: Vec<String> = inner.unused_variables
+      .keys()
+      .cloned()
+      .collect();
+
+    for var_name in variables_to_remove {
+      println!("🔧 ENV_LOADER: Removing variable: {}", var_name);
+      if !inner.original_env.contains_key(&var_name) {
         unsafe {
           env::remove_var(&var_name);
         }
@@ -195,16 +195,9 @@ impl EnvManager {
           );
         }
       } else {
-        // Restore original value
-        let original_value = inner
-          .original_env
-          .get(&var_name.clone())
-          .map(|s| s.as_str())
-          .unwrap_or("");
-        // SAFETY: We're restoring environment variables to their original values.
-        // Both var_name and original_value are valid UTF-8 strings from the original environment.
+        let original_value = inner.original_env.get(&var_name).unwrap();
         unsafe {
-          env::set_var(&var_name.clone(), original_value);
+          env::set_var(&var_name, original_value);
         }
 
         #[allow(clippy::print_stderr)]
@@ -265,7 +258,7 @@ impl EnvManager {
     Ok(())
   }
 
-  /// Load multiple env files in order (earlier files take precedence over later ones)
+  // Load multiple env files in order (earlier files take precedence over later ones)
   pub fn load_env_variables_from_env_files<P: AsRef<Path>>(
     &self,
     file_paths: Option<&Vec<P>>,
@@ -275,11 +268,13 @@ impl EnvManager {
       return 0;
     };
 
-    let mut total_loaded = 0;
     let mut inner = self.inner.lock().unwrap();
-    // let old_variables = std::mem::take(&mut inner.loaded_variables);
-    inner.unused_variables = inner.loaded_variables.clone();
-    inner.loaded_variables = HashMap::new();
+
+      inner.unused_variables = std::mem::take(&mut inner.loaded_variables);
+      inner.loaded_variables = HashMap::new();
+      inner.file_variables.clear();
+
+    let mut total_loaded = 0;
 
     for env_file_name in env_file_names.iter().rev() {
       match self.load_env_file(env_file_name, log_level) {
@@ -287,7 +282,6 @@ impl EnvManager {
           total_loaded += count;
         }
         Err(e) => {
-          // Log critical errors but continue processing other files
           #[allow(clippy::print_stderr)]
           if log_level.map(|l| l >= log::Level::Info).unwrap_or(true) {
             eprintln!(
@@ -301,8 +295,7 @@ impl EnvManager {
       }
     }
 
-    // Clean up variables that are no longer present in any file
-    self._cleanup_removed_variables(&inner.unused_variables, log_level);
+    self._cleanup_removed_variables(&mut inner, log_level);
 
     total_loaded
   }
@@ -315,8 +308,8 @@ pub fn load_env_variables_from_env_files<P: AsRef<Path>>(
   let file_paths_vec: Vec<&P> = file_paths.iter().collect();
   Ok(
     EnvManager::instance().load_env_variables_from_env_files(
-      Some(&file_paths_vec),
-      flags_log_level,
+    Some(&file_paths_vec),
+    flags_log_level,
     ),
   )
 }
