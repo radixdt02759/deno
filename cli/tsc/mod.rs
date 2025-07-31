@@ -18,7 +18,6 @@ use deno_core::RuntimeOptions;
 use deno_core::anyhow::Context;
 use deno_core::located_script_name;
 use deno_core::op2;
-use deno_core::resolve_url_or_path;
 use deno_core::serde::Deserialize;
 use deno_core::serde::Deserializer;
 use deno_core::serde::Serialize;
@@ -32,6 +31,7 @@ use deno_graph::ResolutionResolved;
 use deno_lib::util::checksum;
 use deno_lib::util::hash::FastInsecureHasher;
 use deno_lib::worker::create_isolate_create_params;
+use deno_path_util::resolve_url_or_path;
 use deno_resolver::npm::ResolvePkgFolderFromDenoReqError;
 use deno_resolver::npm::managed::ResolvePkgFolderFromDenoModuleError;
 use deno_semver::npm::NpmPackageReqReference;
@@ -40,7 +40,7 @@ use node_resolver::NodeResolutionKind;
 use node_resolver::ResolutionMode;
 use node_resolver::errors::NodeJsErrorCode;
 use node_resolver::errors::NodeJsErrorCoded;
-use node_resolver::errors::PackageSubpathResolveError;
+use node_resolver::errors::PackageSubpathFromDenoModuleResolveError;
 use node_resolver::resolve_specifier_into_node_modules;
 use once_cell::sync::Lazy;
 use thiserror::Error;
@@ -874,7 +874,7 @@ pub enum ResolveError {
   FilePathToUrl(#[from] deno_path_util::PathToUrlError),
   #[class(inherit)]
   #[error("{0}")]
-  PackageSubpathResolve(PackageSubpathResolveError),
+  PackageSubpathResolve(PackageSubpathFromDenoModuleResolveError),
   #[class(inherit)]
   #[error("{0}")]
   ResolveUrlOrPathError(#[from] deno_path_util::ResolveUrlOrPathError),
@@ -1194,7 +1194,7 @@ pub enum ResolveNonGraphSpecifierTypesError {
   ResolvePkgFolderFromDenoReq(#[from] ResolvePkgFolderFromDenoReqError),
   #[class(inherit)]
   #[error(transparent)]
-  PackageSubpathResolve(#[from] PackageSubpathResolveError),
+  PackageSubpathResolve(#[from] PackageSubpathFromDenoModuleResolveError),
 }
 
 fn resolve_non_graph_specifier_types(
@@ -1303,7 +1303,7 @@ pub enum ExecError {
   ResponseNotSet,
   #[class(inherit)]
   #[error(transparent)]
-  Core(deno_core::error::CoreError),
+  Js(deno_core::error::JsError),
 }
 
 #[derive(Clone)]
@@ -1511,7 +1511,7 @@ pub fn exec(
 
   runtime
     .execute_script(located_script_name!(), exec_source)
-    .map_err(ExecError::Core)?;
+    .map_err(ExecError::Js)?;
 
   let op_state = runtime.op_state();
   let mut op_state = op_state.borrow_mut();
